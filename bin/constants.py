@@ -6,7 +6,7 @@
 # USE 'constants_perso' to declare your modifications
 
 # the tag for replacement
-tag = '€'
+tag = '§'
 
 
 # 1. list of LaTeX environnment whose content will be discard
@@ -15,9 +15,9 @@ tag = '€'
 # Ex. \begin{itemize} ... \end{itemize} is not there and the content will be kept
 
 list_env_discard = ['equation',
-					'equation*',
+					'equation\*',
 					'align',
-					'align*',
+					'align\*',
 					'lstlisting'
 					]
 

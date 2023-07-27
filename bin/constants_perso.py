@@ -12,7 +12,8 @@
 # Ex. \begin{equation} ... \end{equation} will be replace by a tag
 # Ex. \begin{itemize} ... \end{itemize} is not there and the content will be kept
 
-list_env_discard_perso = []    # like ['equation','align*']
+list_env_discard_perso = ['align*'
+                          ]    # like ['equation','align*']
 
 
 

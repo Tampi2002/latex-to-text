@@ -8,7 +8,8 @@
 # Author: Arnaud Bodin. Thanks to Kroum Tzanev
 # Idea from Mr.Sh4nnon https://codereview.stackexchange.com/questions/209049
 # Licence CC-BY-SA 4.0
-
+import deepl
+from credentials import *
 import argparse
 import re
 import sys
@@ -23,34 +24,29 @@ from constants_perso import *  # Personnal customization
 # Arguments 
 parser = argparse.ArgumentParser(description='Conversion a LaTex file to a text file keeping appart commands and maths.')
 parser.add_argument('inputfile', help='input LaTeX filename')
-parser.add_argument('outputfile', nargs='?', help='output text filename')
-parser.add_argument('dicfile', nargs='?', help='output dictionnary filename')
+parser.add_argument('outputdir', nargs='?', help='output directory name')
+
 options = parser.parse_args()
 
 tex_file = options.inputfile
-output_file = options.outputfile
-dictionnary_file = options.dicfile
+output_dir = options.outputdir
+
+isExist = os.path.exists(output_dir)
+if not isExist:
+    os.makedirs(output_dir)
 
 input_dir=''
 for i in range (0,len(tex_file.split('\\'))-1):
     input_dir+=tex_file.split('\\')[i]+'\\'
 print(input_dir)
+true_name=tex_file.split('\\')[i+1].strip('.tex')
 # Get argument: a tex file
 file_name, file_extension = os.path.splitext(tex_file) 
 
 
-# Output file name 
-if output_file:
-    txt_file = output_file    # Name given by user
-else:
-    txt_file = file_name+'.txt' # If no name add a .txt extension
 
-
-# Dictionnary file name 
-if dictionnary_file:
-    dic_file = dictionnary_file    # Name given by user
-else:
-    dic_file = file_name+'.dic' # If no name add a .dic extension
+txt_file = output_dir+"\\"+true_name+'.txt' # If no name add a .txt extension
+dic_file = output_dir+"\\"+true_name+'.dic' # If no name add a .dic extension
 
 
 # Read file object to string
@@ -92,15 +88,17 @@ def func_repl(m):
     count += 1   
     return tag_str                   # New string for pattern replacement
 
+print("Starting replacing TexCode...")
 
 # Now we replace case by case math and command by tags
 ### PART 0 - Replace inputs
+print("PART 0")
 text_new = text_all
 text_new = re.sub(r'\\input\{(.+?)\}',func_repl_input,text_new, flags=re.MULTILINE|re.DOTALL)
 
 
 ### PART 1 - Replace \begin{env} and \end{env} but not its contents
-
+print("PART 1")
 for env in list_env_discard + list_env_discard_perso:
     print(env)
     str_env = r"\\begin\{" + env + r"\}(.+?)\\end\{" + env + r"\}"
@@ -108,7 +106,7 @@ for env in list_env_discard + list_env_discard_perso:
     text_new = re.sub(str_env,func_repl,text_new, flags=re.MULTILINE|re.DOTALL)
 
 ### PART 2 - Replacement of maths ###
-
+print("PART 2")
 # $$ ... $$
 text_new = re.sub(r'\$\$(.+?)\$\$',func_repl,text_new, flags=re.MULTILINE|re.DOTALL)
 # $ ... $
@@ -123,13 +121,13 @@ text_new = re.sub(r'\\\[(.+?)\\\]',func_repl,text_new, flags=re.MULTILINE|re.DOT
 
 
 ### PART 3 - Discards contents of some environnments ###
-
+print("PART 3")
 text_new = re.sub(r'\\begin\{(.+?)\}',func_repl,text_new, flags=re.MULTILINE|re.DOTALL)
 text_new = re.sub(r'\\end\{(.+?)\}',func_repl,text_new, flags=re.MULTILINE|re.DOTALL)
 
 
 ### PART 4 - Replacement of LaTeX commands with their argument ###
-
+print("PART 4")
 for cmd in list_cmd_arg_discard + list_cmd_arg_discard_perso:
     # Without opt arg, ex. \cmd{arg}
     str_env = r'\\' + cmd + r'\{(.+?)\}'
@@ -140,7 +138,7 @@ for cmd in list_cmd_arg_discard + list_cmd_arg_discard_perso:
 
 
 ### PART 5 - Replacement of LaTeX remaining commands (but not their argument) ###
-
+print("PART 5")
 text_new = re.sub(r'\\[a-zA-Z]+',func_repl,text_new, flags=re.MULTILINE|re.DOTALL)
 
 
@@ -153,3 +151,39 @@ with open(txt_file, 'w', encoding='utf-8') as fic_txt:
 # Output: dictionnary file
 with open(dic_file, 'w', encoding='utf-8') as fic_dic:
     yaml.dump(dictionnary,fic_dic, default_flow_style=False,allow_unicode=True)
+print("LaTex code converted")
+to_translate_file = txt_file
+
+new_txt_file = ".."+to_translate_file.strip('.txt')+'_translated.txt' # If no name add a .txt extension
+print("Starting translation...")
+translator = deepl.Translator(auth_key)
+translator.translate_document_from_filepath(to_translate_file,new_txt_file, target_lang="EN-GB")
+print("Translation finished")
+
+print("Reconverting to Tex...")
+# Read file object to string
+fic_txt = open(new_txt_file, 'r', encoding='utf-8')
+text_all = fic_txt.read()
+fic_txt.close()
+
+
+# Read dictionnary
+fic_dic = open(dic_file, 'r', encoding='utf-8')
+dictionnary = yaml.load(fic_dic, Loader=yaml.BaseLoader)
+fic_dic.close()
+
+
+# Replacements start now
+text_new = text_all
+
+for i,val in dictionnary.items():
+    tag_str = tag+str(i)+tag
+    val = val.replace('\\','\\\\')    # double \\ for correct write
+    # val = re.escape(val)
+    text_new = re.sub(tag_str,val,text_new, flags=re.MULTILINE|re.DOTALL)
+
+
+# Write the result
+with open(tex_file, 'w', encoding='utf-8') as fic_tex:
+    fic_tex.write(text_new)
+print("Done !")
